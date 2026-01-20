@@ -165,56 +165,60 @@ Key: path, Value: list of handler functions")
      :initial-value)
     (concatenate 'string <> +crlf+)))
 
+(defun parse-single-float (str) ;; AS
+  (parse-float str :type 'single-float))
+
 (defun can-upgrade-p (header)
   "True if the alist HEADER has qualified to be upgraded to a websocket.
 If nil, the second value will be the reason."
   (handler-case
-      (and
-       ;; method = get
-       (or (->> header
-             (assoc :method)
-             (cdr)
-             (string-upcase)
-             (string= "GET"))
-           (values nil :method))
-       ;; http version greater than 1
-       (or (->> header
-             (assoc :version)
-             (cdr)
-             (str:split "/")
-             (second)
-             (parse-float)
-             (<= 1.1))
-           (values nil :version))
-       ;; missing sec-websocket-key
-       (or (assoc :sec-websocket-key header)
-           (values nil :sec-websocket-key))
-       ;; cors
-       (if -origin-
-           (or (->> header
-                 (assoc :origin)
-                 (cdr)
-                 (string= -origin-))
-               (values nil :origin))
-           t)
-       ;; trying to upgrade
-       (and (or (->> header
-                  (assoc :upgrade)
-                  (cdr)
-                  (string= "websocket"))
-                (values nil :upgrade))
-            (or (->> header
-                  (assoc :connection)
-                  (cdr)
-                  (str:containsp "Upgrade"))
-                (values nil :connection)))
-       ;; script
-       (or (-<>> header
-             (assoc :script)
-             (cdr)
-             (assoc <> -resource-handlers-
-                    :test #'str:starts-with-p))
-           (values nil :script)))
+      (cond ;; AS
+        ;; method = get
+        ((not (->> header
+                   (assoc :method)
+                   (cdr)
+                   (string-upcase)
+                   (string= "GET")))
+         (values nil :method))
+        ;; http version greater than 1
+        ((not (->> header
+                   (assoc :version)
+                   (cdr)
+                   (str:split "/")
+                   (second)
+                   (parse-single-float) ;; AS
+                   (<= 1.1)))
+         (values nil :version))
+        ;; missing sec-websocket-key
+        ((null (assoc :sec-websocket-key header))
+         (values nil :sec-websocket-key))
+        ;; cors
+        ((and -origin-
+              (not (->> header
+                        (assoc :origin)
+                        (cdr)
+                        (string= -origin-))))
+         (values nil :origin))
+       
+        ;; trying to upgrade
+        ((not (->> header
+                   (assoc :upgrade)
+                   (cdr)
+                   (string= "websocket")))
+         (values nil :upgrade))
+        ((not (->> header
+                   (assoc :connection)
+                   (cdr)
+                   (str:containsp "Upgrade")))
+         (values nil :connection))
+        ;; script
+        ((not (-<>> header
+                    (assoc :script)
+                    (cdr)
+                    (assoc <> -resource-handlers-
+                           :test #'str:starts-with-p)))
+         (values nil :script))
+        (t t))
     (t () (values nil :request))))
 
 (defclass websocket ()
@@ -500,4 +504,4 @@ Could also return :eof, :close, :error."
    :name "Websocket Server"))
 
 (defun server-close (websocket-server)
-  (bt:destroy-thread websocket-server))
+  (bt2:destroy-thread websocket-server))

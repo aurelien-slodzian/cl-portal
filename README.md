@@ -2,6 +2,8 @@
 
 Portable websockets for Common Lisp using [usocket](https://github.com/usocket/usocket).
 
+Clone of the original https://git.sr.ht/~charje/cl-portal with minor fixes (bt2 and dependencies).
+
 # Use
 
 ## Define a Resource
